@@ -515,13 +515,24 @@ int do_print(const char *path_p, const struct stat *st, int walk_flags, void *un
 			goto fail;
 	} else {
 		if (opt_comments) {
-			printf("# file: %s\n", xquote(path_p, "\n\r"));
-			printf("# owner: %s\n",
-			       xquote(user_name(st->st_uid, opt_numeric), " \t\n\r"));
-			printf("# group: %s\n",
-			       xquote(group_name(st->st_gid, opt_numeric), " \t\n\r"));
-			if ((st->st_mode & (S_ISVTX | S_ISUID | S_ISGID)) && !posixly_correct)
-				printf("# flags: %s\n", flagstr(st->st_mode));
+      if(opt_json){
+
+        printf("{ \"comment\": \"file\": \"%s\", \"owner\": \"%s\", \"group\": \"%s\"");
+        if ((st->st_mode & (S_ISVTX | S_ISUID | S_ISGID)) && !posixly_correct){
+          printf(", \"flags\": \"%s\" }\n", flagstr(st->st_mode));
+        }else{
+          printf(" }\n");
+        }
+       
+      }else{
+        printf("# file: %s\n", xquote(path_p, "\n\r"));
+        printf("# owner: %s\n",
+               xquote(user_name(st->st_uid, opt_numeric), " \t\n\r"));
+        printf("# group: %s\n",
+               xquote(group_name(st->st_gid, opt_numeric), " \t\n\r"));
+        if ((st->st_mode & (S_ISVTX | S_ISUID | S_ISGID)) && !posixly_correct)
+          printf("# flags: %s\n", flagstr(st->st_mode));
+      }
 		}
 		if (acl != NULL) {
 			char *acl_text = acl_to_any_text(acl, NULL, '\n',
