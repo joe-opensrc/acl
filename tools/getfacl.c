@@ -77,6 +77,7 @@ int opt_strip_leading_slash = 1;
 int opt_comments = 1;  /* include comments */
 int opt_skip_base;  /* skip files that only have the base entries */
 int opt_tabular;  /* tabular output format (alias `showacl') */
+int opt_json;
 #if POSIXLY_CORRECT
 const int posixly_correct = 1;  /* Posix compatible behavior! */
 #else
@@ -689,6 +690,12 @@ int main(int argc, char *argv[])
 					goto synopsis;
 				opt_strip_leading_slash = 0;
 				break;
+
+      case 'j':
+        if (posixly_correct)
+          goto synopsis;
+        opt_json = 1;
+        break;
 
 			case 't':
 				if (posixly_correct)
