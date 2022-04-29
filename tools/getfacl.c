@@ -42,7 +42,7 @@
 #define POSIXLY_CORRECT_STR "POSIXLY_CORRECT"
 
 #if !POSIXLY_CORRECT
-#  define CMD_LINE_OPTIONS "aceEsRLPtpndvh"
+#  define CMD_LINE_OPTIONS "aceEsRLPjtpndvh"
 #endif
 #define POSIXLY_CMD_LINE_OPTIONS "d"
 
@@ -56,6 +56,7 @@ struct option long_options[] = {
 	{ "recursive",	0, 0, 'R' },
 	{ "logical",	0, 0, 'L' },
 	{ "physical",	0, 0, 'P' },
+  { "json", 0, 0, 'j' },
 	{ "tabular",	0, 0, 't' },
 	{ "absolute-names",	0, 0, 'p' },
 	{ "numeric",	0, 0, 'n' },
@@ -490,8 +491,13 @@ int do_print(const char *path_p, const struct stat *st, int walk_flags, void *un
 	    (!acl || acl_equiv_mode(acl, NULL) == 0) && !default_acl)
 		goto cleanup;
 
-	if (opt_print_acl && opt_print_default_acl)
-		default_prefix = "default:";
+	if (opt_print_acl && opt_print_default_acl){
+    if(opt_json){
+      default_prefix = ",\"";
+    }else{
+      default_prefix = "default:";
+    }
+  }
 
 	if (opt_strip_leading_slash) {
 		if (*path_p == '/') {
@@ -510,6 +516,10 @@ int do_print(const char *path_p, const struct stat *st, int walk_flags, void *un
 			path_p = ".";
 	}
 
+  if(opt_json){
+    printf("{");
+  }
+
 	if (opt_tabular)  {
 		if (do_show(stdout, path_p, st, acl, default_acl) != 0)
 			goto fail;
@@ -517,11 +527,17 @@ int do_print(const char *path_p, const struct stat *st, int walk_flags, void *un
 		if (opt_comments) {
       if(opt_json){
 
-        printf("{ \"comment\": \"file\": \"%s\", \"owner\": \"%s\", \"group\": \"%s\"");
+        printf("\"comment\": { \"file\": \"%s\", \"owner\": \"%s\", \"group\": \"%s\"", \
+          xquote(path_p, "\n\r"), \
+          xquote(user_name(st->st_uid, opt_numeric), " \t\n\r"), \
+          xquote(group_name(st->st_gid, opt_numeric), " \t\n\r") 
+        );
+
         if ((st->st_mode & (S_ISVTX | S_ISUID | S_ISGID)) && !posixly_correct){
-          printf(", \"flags\": \"%s\" }\n", flagstr(st->st_mode));
+          printf(", \"flags\": \"%s\" },", flagstr(st->st_mode));
+
         }else{
-          printf(" }\n");
+          printf("},");
         }
        
       }else{
@@ -535,31 +551,44 @@ int do_print(const char *path_p, const struct stat *st, int walk_flags, void *un
       }
 		}
 		if (acl != NULL) {
-			char *acl_text = acl_to_any_text(acl, NULL, '\n',
-							 print_options);
+			char *acl_text = acl_to_any_text(acl, ",\"", '"', print_options);
 			if (!acl_text)
 				goto fail;
-			if (puts(acl_text) < 0) {
-				acl_free(acl_text);
-				goto fail;
-			}
+      if(opt_json){
+        memmove(acl_text, acl_text+1, strlen(acl_text));
+        printf( " \"acl\": [%s\"]", acl_text );
+      }else{
+        if (puts(acl_text) < 0) {
+          acl_free(acl_text);
+          goto fail;
+        }
+      }
 			acl_free(acl_text);
 		}
 		if (default_acl != NULL) {
 			char *acl_text = acl_to_any_text(default_acl, 
-							 default_prefix, '\n',
+							 default_prefix, '"',
 							 print_options);
 			if (!acl_text)
 				goto fail;
-			if (puts(acl_text) < 0) {
-				acl_free(acl_text);
-				goto fail;
-			}
+      if(opt_json){
+        memmove(acl_text, acl_text+1, strlen(acl_text));
+        printf(", \"default\": [%s\"]", acl_text );  
+      }else{
+        if (puts(acl_text) < 0) {
+          acl_free(acl_text);
+          goto fail;
+        }
+      }
 			acl_free(acl_text);
 		}
 	}
 	if (acl || default_acl || opt_comments)
-		printf("\n");
+    if(opt_json){
+      printf("}\n");
+    }else{
+      printf("\n");
+    }
 
 cleanup:
 	if (acl)
@@ -599,6 +628,7 @@ void help(void)
 "  -R, --recursive         recurse into subdirectories\n"
 "  -L, --logical           logical walk, follow symbolic links\n"
 "  -P, --physical          physical walk, do not follow symbolic links\n"
+"  -j, --json              use json output format\n"
 "  -t, --tabular           use tabular output format\n"
 "  -n, --numeric           print numeric user/group identifiers\n"
 "      --one-file-system   skip files on different filesystems\n"
